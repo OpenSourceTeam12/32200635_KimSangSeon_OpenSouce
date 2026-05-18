@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File
+from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pathlib import Path
 import uuid
@@ -55,3 +55,32 @@ async def upload_files(
         "original_file": str(original_path),
         "user_file": str(user_path)
     }
+
+@app.get("/result/{session_id}")
+def get_result(session_id: str):
+    # 1. session_id에 해당하는 세션 폴더 경로 만들기
+    session_path = SESSION_DIR / session_id
+
+    # 2. 해당 세션 폴더가 없으면 404 에러 반환
+    if not session_path.exists():
+        raise HTTPException(
+            status_code=404,
+            detail="해당 session_id를 가진 세션이 존재하지 않습니다."
+        )
+
+    # 3. 세션 폴더 안의 파일 목록 확인
+    saved_files = [file.name for file in session_path.iterdir() if file.is_file()]
+
+    # 4. 아직 AI 분석이 없으므로 더미 결과 반환
+    return {
+        "session_id": session_id,
+        "status": "completed",
+        "saved_files": saved_files,
+        "result": {
+            "pitch_score": 82,
+            "rhythm_score": 76,
+            "total_score": 79,
+            "feedback": "아직 실제 AI 분석은 연결되지 않았으며, 테스트용 더미 결과입니다."
+        }
+    }
+
