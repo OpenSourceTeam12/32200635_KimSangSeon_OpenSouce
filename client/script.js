@@ -47,7 +47,7 @@ document.querySelectorAll("[data-page]").forEach(function (button) {
     });
 });
 
-function handleFirstUpload() {
+async function handleFirstUpload() {
     const originalFile = originalFileInput.files[0];
     const userFile = userFileInput.files[0];
 
@@ -63,10 +63,37 @@ function handleFirstUpload() {
 
     currentMode = "first-analysis";
     moveToPage("serverPage");
-    runFakeServerCheck();
+
+    // FormData로 파일 패킹
+    const formData = new FormData();
+    formData.append("original_file", originalFile);
+    formData.append("user_file", userFile);
+
+    try {
+        // 서버로 전송
+        const response = await fetch("http://localhost:8000/upload", {
+            method: "POST",
+            body: formData
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+            console.log("업로드 성공:", result);
+            // 세션 ID 저장 (나중에 /result 조회할 때 사용)
+            window.sessionId = result.session_id;
+            runFakeServerCheck();
+        } else {
+            alert("업로드 실패: " + JSON.stringify(result));
+        }
+
+    } catch (error) {
+        alert("서버 연결 실패: " + error.message);
+        moveToPage("uploadPage");
+    }
 }
 
-function handlePracticeUpload() {
+async function handlePracticeUpload() {
     const practiceFile = practiceFileInput.files[0];
 
     if (!practiceFile) {
