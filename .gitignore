@@ -45,3 +45,6 @@ Thumbs.db
 # External Pipeline Project
 # =========================
 opensource_pipeline/
+# SQLite DB
+*.db
+singing-coach-server/*.db
