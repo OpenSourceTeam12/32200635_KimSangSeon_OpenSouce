@@ -189,8 +189,10 @@ async def upload_files(
 
 @app.get("/result/{session_id}")
 def get_result(session_id: str):
+    # 1. session_id에 해당하는 세션 폴더 경로 만들기
     session_path = SESSION_DIR / session_id
 
+    # 2. 해당 세션 폴더가 없으면 404 에러 반환
     if not session_path.exists():
         raise HTTPException(
             status_code=404,
@@ -219,3 +221,4 @@ def get_result(session_id: str):
         "status": job.status,
         "job": asdict(job)
     }
+
