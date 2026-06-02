@@ -9,6 +9,10 @@ from app.services.pipeline_service import (
 )
 from app.services.db_service import (
     init_db,
+    calculate_file_hash,
+    get_original_cache,
+    save_original_cache,
+    update_original_cache_usage,
     save_session_metadata,
     save_analysis_result,
     save_metadata_json
@@ -55,6 +59,9 @@ class AnalysisJob:
     started_at: str | None = None
     completed_at: str | None = None
     error_message: str | None = None
+    original_hash: str | None = None
+    cache_status: str | None = None
+    cache_use_count: int | None = None
 
 
 def update_job_status(session_id: str, **kwargs):
@@ -85,20 +92,48 @@ def process_analysis_job(job: AnalysisJob):
             session_dir=job.session_dir
         )
 
-        # 3. 파이프라인 연결 결과를 result.json으로 저장
+        # 3. 원곡 캐시 정보를 분석 결과에 추가
+        result_data["cache"] = {
+            "original_hash": job.original_hash,
+            "cache_status": job.cache_status,
+            "use_count": job.cache_use_count
+        }
+
+        # 4. 파이프라인 연결 결과를 result.json으로 저장
         save_pipeline_result(
             session_dir=job.session_dir,
             result_data=result_data
         )
 
-        # 4. 분석 결과를 DB에 저장
+        # 5. 분석 결과를 DB에 저장
         save_analysis_result(
             session_id=job.session_id,
             session_dir=job.session_dir,
             result_data=result_data
         )
 
-        # 5. 파이프라인 연결 실패 시 예외 발생
+        # 6. cache_miss인 경우 원곡 캐시 정보를 DB에 저장
+        if job.cache_status == "cache_miss":
+            cache_use_count = save_original_cache(
+                original_hash=job.original_hash,
+                original_file_path=job.original_file_path
+            )
+
+            job.cache_status = "cache_miss_saved"
+            job.cache_use_count = cache_use_count
+
+            result_data["cache"] = {
+                "original_hash": job.original_hash,
+                "cache_status": job.cache_status,
+                "use_count": job.cache_use_count
+            }
+
+            save_pipeline_result(
+                session_dir=job.session_dir,
+                result_data=result_data
+            )
+
+        # 7. 파이프라인 연결 실패 시 예외 발생
         if result_data.get("status") == "failed":
             raise Exception(
                 result_data.get(
@@ -109,14 +144,16 @@ def process_analysis_job(job: AnalysisJob):
 
         completed_at = datetime.now().isoformat()
 
-        # 6. 작업 상태를 completed로 변경
+        # 8. 작업 상태를 completed로 변경
         update_job_status(
             job.session_id,
             status="completed",
-            completed_at=completed_at
+            completed_at=completed_at,
+            cache_status=job.cache_status,
+            cache_use_count=job.cache_use_count
         )
 
-        # 7. 완료된 세션 정보를 metadata.json과 DB에 다시 저장
+        # 9. 완료된 세션 정보를 metadata.json과 DB에 다시 저장
         save_metadata_json(
             session_id=job.session_id,
             original_file_path=job.original_file_path,
@@ -124,7 +161,10 @@ def process_analysis_job(job: AnalysisJob):
             session_dir=job.session_dir,
             status="completed",
             created_at=job.created_at,
-            completed_at=completed_at
+            completed_at=completed_at,
+            original_hash=job.original_hash,
+            cache_status=job.cache_status,
+            cache_use_count=job.cache_use_count
         )
 
         save_session_metadata(
@@ -143,7 +183,7 @@ def process_analysis_job(job: AnalysisJob):
 
         failed_at = datetime.now().isoformat()
 
-        # 8. 분석 실패 시 failed 상태로 변경
+        # 10. 분석 실패 시 failed 상태로 변경
         update_job_status(
             job.session_id,
             status="failed",
@@ -151,7 +191,7 @@ def process_analysis_job(job: AnalysisJob):
             completed_at=failed_at
         )
 
-        # 9. 실패한 세션 정보를 metadata.json과 DB에 저장
+        # 11. 실패한 세션 정보를 metadata.json과 DB에 저장
         save_metadata_json(
             session_id=job.session_id,
             original_file_path=job.original_file_path,
@@ -159,7 +199,10 @@ def process_analysis_job(job: AnalysisJob):
             session_dir=job.session_dir,
             status="failed",
             created_at=job.created_at,
-            completed_at=failed_at
+            completed_at=failed_at,
+            original_hash=job.original_hash,
+            cache_status=job.cache_status,
+            cache_use_count=job.cache_use_count
         )
 
         save_session_metadata(
@@ -275,28 +318,47 @@ async def upload_files(
             buffer
         )
 
-    # 6. 분석 작업 Job 생성
+    # 6. 원곡 파일 hash 생성
+    original_hash = calculate_file_hash(str(original_path))
+
+    # 7. 원곡 캐시 조회
+    cached_original = get_original_cache(original_hash)
+
+    if cached_original is None:
+        cache_status = "cache_miss"
+        cache_use_count = 0
+    else:
+        cache_status = "cache_hit"
+        cache_use_count = update_original_cache_usage(original_hash)
+
+    # 8. 분석 작업 Job 생성
     job = AnalysisJob(
         session_id=session_id,
         original_file_path=str(original_path),
         user_file_path=str(user_path),
         session_dir=str(current_session_dir),
         status="queued",
-        created_at=datetime.now().isoformat()
+        created_at=datetime.now().isoformat(),
+        original_hash=original_hash,
+        cache_status=cache_status,
+        cache_use_count=cache_use_count
     )
 
-    # 7. 작업 상태 저장
+    # 9. 작업 상태 저장
     with job_lock:
         job_status[session_id] = job
 
-    # 8. 세션 정보를 metadata.json과 DB에 저장
+    # 10. 세션 정보를 metadata.json과 DB에 저장
     save_metadata_json(
         session_id=session_id,
         original_file_path=str(original_path),
         user_file_path=str(user_path),
         session_dir=str(current_session_dir),
         status="queued",
-        created_at=job.created_at
+        created_at=job.created_at,
+        original_hash=original_hash,
+        cache_status=cache_status,
+        cache_use_count=cache_use_count
     )
 
     save_session_metadata(
@@ -308,10 +370,10 @@ async def upload_files(
         created_at=job.created_at
     )
 
-    # 9. JobQueue에 분석 작업 추가
+    # 11. JobQueue에 분석 작업 추가
     job_queue.put(job)
 
-    # 10. 클라이언트에게 결과 반환
+    # 12. 클라이언트에게 결과 반환
     return {
         "message": (
             "파일 업로드 성공. "
@@ -322,7 +384,13 @@ async def upload_files(
         "status": "queued",
 
         "original_file": str(original_path),
-        "user_file": str(user_path)
+        "user_file": str(user_path),
+
+        "cache": {
+            "original_hash": original_hash,
+            "cache_status": cache_status,
+            "use_count": cache_use_count
+        }
     }
 
 
@@ -384,6 +452,11 @@ def get_result(session_id: str):
         "session_id": session_id,
         "status": job.status,
         "saved_files": saved_files,
+        "cache": {
+            "original_hash": job.original_hash,
+            "cache_status": job.cache_status,
+            "use_count": job.cache_use_count
+        },
         "job": asdict(job)
     }
 
