@@ -1,1 +1,5 @@
 .DS_Store
+**/.DS_Store
+__MACOSX/
+touch .gitignore
+open .gitignore
