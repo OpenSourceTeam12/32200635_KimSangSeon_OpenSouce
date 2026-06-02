@@ -7,6 +7,12 @@ from app.services.pipeline_service import (
     run_pipeline_from_server,
     save_pipeline_result
 )
+from app.services.db_service import (
+    init_db,
+    save_session_metadata,
+    save_analysis_result,
+    save_metadata_json
+)
 
 import uuid
 import shutil
@@ -85,7 +91,14 @@ def process_analysis_job(job: AnalysisJob):
             result_data=result_data
         )
 
-        # 4. 파이프라인 연결 실패 시 예외 발생
+        # 4. 분석 결과를 DB에 저장
+        save_analysis_result(
+            session_id=job.session_id,
+            session_dir=job.session_dir,
+            result_data=result_data
+        )
+
+        # 5. 파이프라인 연결 실패 시 예외 발생
         if result_data.get("status") == "failed":
             raise Exception(
                 result_data.get(
@@ -94,23 +107,69 @@ def process_analysis_job(job: AnalysisJob):
                 )
             )
 
-        # 5. 작업 상태를 completed로 변경
+        completed_at = datetime.now().isoformat()
+
+        # 6. 작업 상태를 completed로 변경
         update_job_status(
             job.session_id,
             status="completed",
-            completed_at=datetime.now().isoformat()
+            completed_at=completed_at
+        )
+
+        # 7. 완료된 세션 정보를 metadata.json과 DB에 다시 저장
+        save_metadata_json(
+            session_id=job.session_id,
+            original_file_path=job.original_file_path,
+            user_file_path=job.user_file_path,
+            session_dir=job.session_dir,
+            status="completed",
+            created_at=job.created_at,
+            completed_at=completed_at
+        )
+
+        save_session_metadata(
+            session_id=job.session_id,
+            original_file_path=job.original_file_path,
+            user_file_path=job.user_file_path,
+            session_dir=job.session_dir,
+            status="completed",
+            created_at=job.created_at,
+            completed_at=completed_at
         )
 
         print(f"[Worker] 분석 완료: {job.session_id}")
 
     except Exception as e:
 
-        # 6. 분석 실패 시 failed 상태로 변경
+        failed_at = datetime.now().isoformat()
+
+        # 8. 분석 실패 시 failed 상태로 변경
         update_job_status(
             job.session_id,
             status="failed",
             error_message=str(e),
-            completed_at=datetime.now().isoformat()
+            completed_at=failed_at
+        )
+
+        # 9. 실패한 세션 정보를 metadata.json과 DB에 저장
+        save_metadata_json(
+            session_id=job.session_id,
+            original_file_path=job.original_file_path,
+            user_file_path=job.user_file_path,
+            session_dir=job.session_dir,
+            status="failed",
+            created_at=job.created_at,
+            completed_at=failed_at
+        )
+
+        save_session_metadata(
+            session_id=job.session_id,
+            original_file_path=job.original_file_path,
+            user_file_path=job.user_file_path,
+            session_dir=job.session_dir,
+            status="failed",
+            created_at=job.created_at,
+            completed_at=failed_at
         )
 
         print(
@@ -141,6 +200,9 @@ def startup_event():
         parents=True,
         exist_ok=True
     )
+
+    # 서버 시작 시 DB 테이블 생성
+    init_db()
 
     # 서버 시작 시 Worker Thread 생성
     worker_count = 2
@@ -227,10 +289,29 @@ async def upload_files(
     with job_lock:
         job_status[session_id] = job
 
-    # 8. JobQueue에 분석 작업 추가
+    # 8. 세션 정보를 metadata.json과 DB에 저장
+    save_metadata_json(
+        session_id=session_id,
+        original_file_path=str(original_path),
+        user_file_path=str(user_path),
+        session_dir=str(current_session_dir),
+        status="queued",
+        created_at=job.created_at
+    )
+
+    save_session_metadata(
+        session_id=session_id,
+        original_file_path=str(original_path),
+        user_file_path=str(user_path),
+        session_dir=str(current_session_dir),
+        status="queued",
+        created_at=job.created_at
+    )
+
+    # 9. JobQueue에 분석 작업 추가
     job_queue.put(job)
 
-    # 9. 클라이언트에게 결과 반환
+    # 10. 클라이언트에게 결과 반환
     return {
         "message": (
             "파일 업로드 성공. "
