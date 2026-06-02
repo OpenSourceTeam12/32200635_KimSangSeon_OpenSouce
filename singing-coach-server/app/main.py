@@ -247,7 +247,6 @@ async def upload_files(
 
 @app.get("/result/{session_id}")
 def get_result(session_id: str):
-
     # 1. session_id에 해당하는 세션 폴더 경로 만들기
     session_path = SESSION_DIR / session_id
 
@@ -306,3 +305,4 @@ def get_result(session_id: str):
         "saved_files": saved_files,
         "job": asdict(job)
     }
+

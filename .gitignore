@@ -10,6 +10,7 @@ __pycache__/
 # Virtual Environment
 # =========================
 venv/
+singing-coach-server/app/venv/
 .env
 
 # =========================
@@ -45,3 +46,7 @@ Thumbs.db
 # External Pipeline Project
 # =========================
 opensource_pipeline/
+opensource_pipeline/ffmpeg.exe
+opensource_pipeline/ffplay.exe
+opensource_pipeline/ffprobe.exe
+opensource_pipeline/ffmpeg-8.1/
