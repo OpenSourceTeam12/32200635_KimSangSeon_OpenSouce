@@ -1,5 +1,6 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 from dataclasses import dataclass, asdict
 from datetime import datetime
@@ -38,6 +39,19 @@ app.add_middleware(
 BASE_DIR = Path(__file__).resolve().parent.parent
 SESSION_DIR = BASE_DIR / "sessions"
 
+# StaticFiles 연결 전에 sessions 디렉토리 생성
+SESSION_DIR.mkdir(
+    parents=True,
+    exist_ok=True
+)
+
+# 세션 디렉토리 안의 이미지, 결과 파일을 URL로 접근 가능하게 제공
+app.mount(
+    "/sessions",
+    StaticFiles(directory=SESSION_DIR),
+    name="sessions"
+)
+
 # 분석 작업을 저장하는 JobQueue 생성
 job_queue = queue.Queue()
 
@@ -72,6 +86,72 @@ def update_job_status(session_id: str, **kwargs):
                 setattr(job_status[session_id], key, value)
 
 
+def get_visualization_urls(session_id: str) -> dict:
+    # 클라이언트가 사용할 수 있는 시각화 자료 URL 생성
+    session_path = SESSION_DIR / session_id
+
+    pitch_path = session_path / "pitch.png"
+    rhythm_path = session_path / "rhythm.png"
+
+    return {
+        "pitch": (
+            f"/sessions/{session_id}/pitch.png"
+            if pitch_path.exists()
+            else None
+        ),
+        "rhythm": (
+            f"/sessions/{session_id}/rhythm.png"
+            if rhythm_path.exists()
+            else None
+        )
+    }
+
+
+def make_client_result_response(
+    session_id: str,
+    status: str,
+    saved_files: list[str],
+    result_data: dict | None = None,
+    job: AnalysisJob | None = None
+) -> dict:
+    # 수연 클라이언트에서 바로 사용하기 위한 통일된 결과 응답 구조 생성
+
+    if result_data is None:
+        result_data = {}
+
+    result = result_data.get("result", {})
+    cache = result_data.get("cache", {})
+
+    if job is not None and not cache:
+        cache = {
+            "original_hash": job.original_hash,
+            "cache_status": job.cache_status,
+            "use_count": job.cache_use_count
+        }
+
+    return {
+        "session_id": session_id,
+        "status": status,
+        "scores": {
+            "pitch_score": result.get("pitch_score", 0),
+            "rhythm_score": result.get("rhythm_score", 0),
+            "total_score": result.get("total_score", 0)
+        },
+        "feedback": result.get("feedback"),
+        "pitch_data": result_data.get("pitch_data", []),
+        "rhythm_data": result_data.get("rhythm_data", []),
+        "visualization_urls": result_data.get(
+            "visualization_urls",
+            get_visualization_urls(session_id)
+        ),
+        "pipeline_status": result_data.get("pipeline_status"),
+        "audio_info": result_data.get("audio_info"),
+        "cache": cache,
+        "saved_files": saved_files,
+        "job": asdict(job) if job is not None else None
+    }
+
+
 def process_analysis_job(job: AnalysisJob):
 
     try:
@@ -99,20 +179,25 @@ def process_analysis_job(job: AnalysisJob):
             "use_count": job.cache_use_count
         }
 
-        # 4. 파이프라인 연결 결과를 result.json으로 저장
+        # 4. 클라이언트 전달용 시각화 URL 추가
+        result_data["visualization_urls"] = get_visualization_urls(
+            job.session_id
+        )
+
+        # 5. 파이프라인 연결 결과를 result.json으로 저장
         save_pipeline_result(
             session_dir=job.session_dir,
             result_data=result_data
         )
 
-        # 5. 분석 결과를 DB에 저장
+        # 6. 분석 결과를 DB에 저장
         save_analysis_result(
             session_id=job.session_id,
             session_dir=job.session_dir,
             result_data=result_data
         )
 
-        # 6. cache_miss인 경우 원곡 캐시 정보를 DB에 저장
+        # 7. cache_miss인 경우 원곡 캐시 정보를 DB에 저장
         if job.cache_status == "cache_miss":
             cache_use_count = save_original_cache(
                 original_hash=job.original_hash,
@@ -128,12 +213,16 @@ def process_analysis_job(job: AnalysisJob):
                 "use_count": job.cache_use_count
             }
 
+            result_data["visualization_urls"] = get_visualization_urls(
+                job.session_id
+            )
+
             save_pipeline_result(
                 session_dir=job.session_dir,
                 result_data=result_data
             )
 
-        # 7. 파이프라인 연결 실패 시 예외 발생
+        # 8. 파이프라인 연결 실패 시 예외 발생
         if result_data.get("status") == "failed":
             raise Exception(
                 result_data.get(
@@ -144,7 +233,7 @@ def process_analysis_job(job: AnalysisJob):
 
         completed_at = datetime.now().isoformat()
 
-        # 8. 작업 상태를 completed로 변경
+        # 9. 작업 상태를 completed로 변경
         update_job_status(
             job.session_id,
             status="completed",
@@ -153,7 +242,7 @@ def process_analysis_job(job: AnalysisJob):
             cache_use_count=job.cache_use_count
         )
 
-        # 9. 완료된 세션 정보를 metadata.json과 DB에 다시 저장
+        # 10. 완료된 세션 정보를 metadata.json과 DB에 다시 저장
         save_metadata_json(
             session_id=job.session_id,
             original_file_path=job.original_file_path,
@@ -183,7 +272,7 @@ def process_analysis_job(job: AnalysisJob):
 
         failed_at = datetime.now().isoformat()
 
-        # 10. 분석 실패 시 failed 상태로 변경
+        # 11. 분석 실패 시 failed 상태로 변경
         update_job_status(
             job.session_id,
             status="failed",
@@ -191,7 +280,7 @@ def process_analysis_job(job: AnalysisJob):
             completed_at=failed_at
         )
 
-        # 11. 실패한 세션 정보를 metadata.json과 DB에 저장
+        # 12. 실패한 세션 정보를 metadata.json과 DB에 저장
         save_metadata_json(
             session_id=job.session_id,
             original_file_path=job.original_file_path,
@@ -410,7 +499,34 @@ def get_result(session_id: str):
             )
         )
 
-    # 3. session_id에 해당하는 작업 상태 확인
+    # 3. 세션 폴더 안의 파일 목록 확인
+    saved_files = [
+        file.name
+        for file in session_path.iterdir()
+        if file.is_file()
+    ]
+
+    # 4. result.json이 있으면 실제 저장된 결과 반환
+    result_path = session_path / "result.json"
+
+    if result_path.exists():
+
+        with open(
+            result_path,
+            "r",
+            encoding="utf-8"
+        ) as f:
+
+            result_data = json.load(f)
+
+        return make_client_result_response(
+            session_id=session_id,
+            status=result_data.get("status", "completed"),
+            saved_files=saved_files,
+            result_data=result_data
+        )
+
+    # 5. session_id에 해당하는 작업 상태 확인
     with job_lock:
         job = job_status.get(session_id)
 
@@ -424,39 +540,26 @@ def get_result(session_id: str):
             )
         )
 
-    # 4. 세션 폴더 안의 파일 목록 확인
-    saved_files = [
-        file.name
-        for file in session_path.iterdir()
-        if file.is_file()
-    ]
+    # 6. 분석 실패 상태이면 failed 응답 반환
+    if job.status == "failed":
 
-    # 5. 분석이 완료되었고 result.json이 있으면 반환
-    result_path = session_path / "result.json"
+        return {
+            "session_id": session_id,
+            "status": "failed",
+            "error_message": job.error_message,
+            "saved_files": saved_files,
+            "cache": {
+                "original_hash": job.original_hash,
+                "cache_status": job.cache_status,
+                "use_count": job.cache_use_count
+            },
+            "job": asdict(job)
+        }
 
-    if (
-        job.status == "completed"
-        and result_path.exists()
-    ):
-
-        with open(
-            result_path,
-            "r",
-            encoding="utf-8"
-        ) as f:
-
-            return json.load(f)
-
-    # 6. 아직 분석이 끝나지 않았으면 현재 상태 반환
-    return {
-        "session_id": session_id,
-        "status": job.status,
-        "saved_files": saved_files,
-        "cache": {
-            "original_hash": job.original_hash,
-            "cache_status": job.cache_status,
-            "use_count": job.cache_use_count
-        },
-        "job": asdict(job)
-    }
-
+    # 7. 아직 분석이 끝나지 않았으면 현재 상태 반환
+    return make_client_result_response(
+        session_id=session_id,
+        status=job.status,
+        saved_files=saved_files,
+        job=job
+    )
