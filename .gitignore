@@ -10,6 +10,7 @@ __pycache__/
 # Virtual Environment
 # =========================
 venv/
+singing-coach-server/app/venv/
 .env
 
 # =========================
@@ -39,12 +40,7 @@ result.json
 # OS Files
 # =========================
 .DS_Store
-Thumbs.db
-
-# =========================
-# External Pipeline Project
-# =========================
-opensource_pipeline/
-# SQLite DB
-*.db
-singing-coach-server/*.db
+**/.DS_Store
+__MACOSX/
+._*
+.DS_Store
