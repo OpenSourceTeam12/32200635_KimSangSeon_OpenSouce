@@ -288,3 +288,38 @@ def save_metadata_json(
 
     with open(metadata_path, "w", encoding="utf-8") as f:
         json.dump(metadata, f, ensure_ascii=False, indent=4)
+
+def get_latest_score(session_id: str):
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT
+            pitch_score,
+            rhythm_score,
+            total_score,
+            feedback,
+            cache_status,
+            cache_use_count
+        FROM analysis_results
+        WHERE session_id = ?
+        ORDER BY id DESC
+        LIMIT 1
+    """, (session_id,))
+
+    row = cursor.fetchone()
+
+    conn.close()
+
+    if row is None:
+        return None
+
+    return {
+        "pitch_score": row[0],
+        "rhythm_score": row[1],
+        "total_score": row[2],
+        "feedback": row[3],
+        "cache_status": row[4],
+        "cache_use_count": row[5]
+    }
