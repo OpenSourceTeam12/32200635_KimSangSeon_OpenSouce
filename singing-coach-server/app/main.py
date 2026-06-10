@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
@@ -16,7 +16,8 @@ from app.services.db_service import (
     update_original_cache_usage,
     save_session_metadata,
     save_analysis_result,
-    save_metadata_json
+    save_metadata_json,
+    get_latest_score
 )
 
 import uuid
@@ -563,3 +564,113 @@ def get_result(session_id: str):
         saved_files=saved_files,
         job=job
     )
+
+
+@app.post("/retry/{session_id}")
+async def retry_analysis(
+    session_id: str,
+    retry_file: UploadFile = File(...),
+    wrong_start_time: float = Form(...),
+    retry_duration: float = Form(...)
+):
+
+    session_dir = SESSION_DIR / session_id
+
+    if not session_dir.exists():
+        raise HTTPException(
+            status_code=404,
+            detail="session not found"
+        )
+
+    retry_file_path = (
+        session_dir /
+        f"retry_{retry_file.filename}"
+    )
+
+    with open(retry_file_path, "wb") as buffer:
+        shutil.copyfileobj(
+            retry_file.file,
+            buffer
+        )
+
+    metadata_path = session_dir / "metadata.json"
+
+    if not metadata_path.exists():
+        raise HTTPException(
+            status_code=404,
+            detail="metadata.json not found"
+        )
+
+    with open(metadata_path, "r", encoding="utf-8") as f:
+        metadata = json.load(f)
+
+    original_file_path = metadata["original_file_path"]
+
+    retry_result = run_pipeline_from_server(
+        session_id=session_id,
+        original_file_path=original_file_path,
+        user_file_path=str(retry_file_path),
+        session_dir=str(session_dir)
+    )
+
+    retry_result["retry_info"] = {
+        "wrong_start_time": wrong_start_time,
+        "retry_duration": retry_duration
+    }
+
+    retry_result_path = (
+        session_dir /
+        "retryResult.json"
+    )
+
+    with open(
+        retry_result_path,
+        "w",
+        encoding="utf-8"
+    ) as f:
+        json.dump(
+            retry_result,
+            f,
+            ensure_ascii=False,
+            indent=4
+        )
+
+    return {
+        "message": "retry analysis completed",
+        "session_id": session_id,
+        "retry_result_path": str(retry_result_path),
+        "retry_info": {
+            "wrong_start_time": wrong_start_time,
+            "retry_duration": retry_duration
+        }
+    }
+
+
+@app.get("/retry/{session_id}/cached-score")
+def get_cached_score(
+    session_id: str
+):
+
+    score = get_latest_score(
+        session_id
+    )
+
+    if score is None:
+        raise HTTPException(
+            status_code=404,
+            detail="score not found"
+        )
+
+    return {
+        "session_id": session_id,
+        "cached_scores": {
+            "pitch_score": score["pitch_score"],
+            "rhythm_score": score["rhythm_score"],
+            "total_score": score["total_score"]
+        },
+        "feedback": score["feedback"],
+        "cache": {
+            "cache_status": score["cache_status"],
+            "use_count": score["cache_use_count"]
+        }
+    }
