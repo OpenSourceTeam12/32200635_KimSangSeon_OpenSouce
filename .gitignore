@@ -1,5 +1,3 @@
-
-· GITIGNORE
 # =========================
 # Python
 # =========================
@@ -7,50 +5,42 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
- 
+
 # =========================
 # Virtual Environment
 # =========================
 venv/
 singing-coach-server/app/venv/
 .env
- 
+
 # =========================
 # Session / Runtime Data
 # =========================
 sessions/
 singing-coach-server/sessions/
- 
+
 # =========================
 # Audio Files
 # =========================
 *.wav
 *.mp3
 *.flac
- 
+
 # =========================
 # Result Files
 # =========================
 result.json
- 
+
 # =========================
 # VSCode
 # =========================
 .vscode/
- 
+
 # =========================
 # OS Files
 # =========================
 .DS_Store
 **/.DS_Store
 __MACOSX/
-Thumbs.db
- 
-# =========================
-# External Pipeline Project
-# =========================
-opensource_pipeline/
-opensource_pipeline/ffmpeg.exe
-opensource_pipeline/ffplay.exe
-opensource_pipeline/ffprobe.exe
-opensource_pipeline/ffmpeg-8.1/
+._*
+.DS_Store
