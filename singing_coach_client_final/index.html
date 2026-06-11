@@ -1,11 +1,13 @@
 <!DOCTYPE html>
 <html lang="ko">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>노래 코칭 프로그램</title>
   <link rel="stylesheet" href="style.css" />
 </head>
+
 <body>
   <div class="app-shell">
     <header class="tab-header">
@@ -44,17 +46,29 @@
         </div>
 
         <div class="flow-strip" aria-label="분석 흐름">
-          <div><span>01</span><strong>파일 준비</strong><p>원곡과 내 녹음</p></div>
-          <div><span>02</span><strong>실시간 비교</strong><p>피치와 음정</p></div>
-          <div><span>03</span><strong>박자 분석</strong><p>타이밍 차이</p></div>
-          <div><span>04</span><strong>최종 결과</strong><p>점수와 피드백</p></div>
-          <div><span>05</span><strong>재녹음·저장</strong><p>틀린 구간 연습과 탭 기록</p></div>
+          <div><span>01</span><strong>파일 준비</strong>
+            <p>원곡과 내 녹음</p>
+          </div>
+          <div><span>02</span><strong>실시간 비교</strong>
+            <p>피치와 음정</p>
+          </div>
+          <div><span>03</span><strong>박자 분석</strong>
+            <p>타이밍 차이</p>
+          </div>
+          <div><span>04</span><strong>최종 결과</strong>
+            <p>점수와 피드백</p>
+          </div>
+          <div><span>05</span><strong>재녹음·저장</strong>
+            <p>틀린 구간 연습과 탭 기록</p>
+          </div>
         </div>
       </section>
 
       <section id="uploadPage" class="page">
         <section class="panel">
-          <div class="title-row"><h2>원본과 녹음 준비</h2><span></span></div>
+          <div class="title-row">
+            <h2>원본과 녹음 준비</h2><span></span>
+          </div>
 
           <div class="upload-grid">
             <div class="upload-column">
@@ -99,7 +113,9 @@
 
       <section id="serverPage" class="page">
         <section class="panel narrow">
-          <div class="title-row"><h2>서버 확인</h2><span></span></div>
+          <div class="title-row">
+            <h2>서버 확인</h2><span></span>
+          </div>
           <div class="status-box">
             <div><span>원곡 파일 전송</span><strong id="originalStatus">--</strong></div>
             <div><span>사용자 녹음 파일 전송</span><strong id="userStatus">--</strong></div>
@@ -115,17 +131,30 @@
 
       <section id="livePage" class="page">
         <section class="panel">
-          <div class="title-row"><h2>실시간 원곡 비교</h2><span></span></div>
+          <div class="title-row">
+            <h2>실시간 원곡 비교</h2><span></span>
+          </div>
           <div class="empty-graph-stage">
-            <div class="legend"><p><i class="original"></i>원곡</p><p><i class="user"></i>사용자</p></div>
+            <div class="legend">
+              <p><i class="original"></i>원곡</p>
+              <p><i class="user"></i>사용자</p>
+            </div>
             <div class="total-pill"><small>종합 점수</small><b id="liveTotalScore">--</b></div>
-            <p class="empty-note">실시간 피치 그래프 표시 영역</p>
+            <canvas id="livePitchCanvas" aria-label="음정 오차 그래프" style="width:100%;height:100%;display:block;"></canvas>
+            <div id="pitchEffectLayer" aria-hidden="true"></div>
           </div>
-          <div class="score-grid two">
+          <div class="score-grid one">
             <div><span>피치</span><strong id="livePitchScore">--</strong></div>
-            <div><span>음정</span><strong id="liveToneScore">--</strong></div>
           </div>
-          <div class="feedback"><h3>실시간 코칭 피드백</h3><p id="pitchFeedback"></p></div>
+          <div class="rhythm-headline" id="pitchNowHeadline">
+            <strong id="pitchNowLabel"></strong>
+            <span id="pitchNowOffset"></span>
+          </div>
+          <div class="feedback">
+            <h3>실시간 코칭 피드백</h3>
+            <p id="pitchFeedback"></p>
+          </div>
+          <button id="replayPitchButton" class="sub-btn" type="button">음정 그래프 다시 재생</button>
           <button id="goRhythmButton" class="main-btn" type="button">박자 분석으로 이동</button>
           <button class="sub-btn" type="button" data-page="serverPage">이전</button>
         </section>
@@ -133,7 +162,9 @@
 
       <section id="rhythmPage" class="page">
         <section class="panel">
-          <div class="title-row"><h2>박자 분석</h2><span></span></div>
+          <div class="title-row">
+            <h2>박자 분석</h2><span></span>
+          </div>
           <div class="empty-rhythm-stage rhythm-stage-ready">
             <canvas id="rhythmCanvas" aria-label="박자 오차 움직이는 그래프"></canvas>
             <div id="rhythmEffectLayer" aria-hidden="true"></div>
@@ -142,13 +173,17 @@
               <span id="rhythmNowOffset">현재 박자 점에서 원곡 / 사용자 / 오차를 표시합니다.</span>
             </div>
             <div class="rhythm-legend" aria-label="박자 오차 범례">
-              <span><i class="rhythm-dot exact"></i>정확 <b id="rhythmExactCount">0</b></span>
+              <span><i class="rhythm-dot very-fast"></i>매우빠름 <b id="rhythmVeryFastCount">0</b></span>
               <span><i class="rhythm-dot fast"></i>빠름 <b id="rhythmFastCount">0</b></span>
+              <span><i class="rhythm-dot exact"></i>정확 <b id="rhythmExactCount">0</b></span>
               <span><i class="rhythm-dot slow"></i>느림 <b id="rhythmSlowCount">0</b></span>
+              <span><i class="rhythm-dot very-slow"></i>매우느림 <b id="rhythmVerySlowCount">0</b></span>
             </div>
           </div>
           <button id="replayRhythmButton" class="sub-btn" type="button">박자 그래프 다시 재생</button>
-          <div class="score-grid one"><div><span>박자</span><strong id="rhythmScore">--</strong></div></div>
+          <div class="score-grid one">
+            <div><span>박자</span><strong id="rhythmScore">--</strong></div>
+          </div>
           <button id="goFinalButton" class="main-btn" type="button">최종 결과 보기</button>
           <button class="sub-btn" type="button" data-page="livePage">이전</button>
         </section>
@@ -156,15 +191,22 @@
 
       <section id="finalPage" class="page">
         <section class="panel narrow">
-          <div class="title-row"><h2 id="finalTitle">최종 결과</h2><span></span></div>
+          <div class="title-row">
+            <h2 id="finalTitle">최종 결과</h2><span></span>
+          </div>
           <div class="final-total"><span>최종 종합 점수</span><strong id="finalTotalScore">--</strong></div>
-          <div class="score-grid three">
+          <div class="score-grid two">
             <div><span>피치</span><strong id="finalPitchScore">--</strong></div>
-            <div><span>음정</span><strong id="finalToneScore">--</strong></div>
             <div><span>박자</span><strong id="finalRhythmScore">--</strong></div>
           </div>
-          <div class="feedback"><h3>최종 피드백</h3><p id="finalFeedback"></p></div>
-          <div class="feedback"><h3>가장 많이 틀린 구간</h3><p id="wrongSection"></p></div>
+          <div class="feedback">
+            <h3>최종 피드백</h3>
+            <p id="finalFeedback"></p>
+          </div>
+          <div class="feedback">
+            <h3>가장 많이 틀린 구간</h3>
+            <p id="wrongSection"></p>
+          </div>
 
           <div class="save-record-box">
             <label for="recordTitleInput">이 분석 이름 정하기</label>
@@ -177,39 +219,52 @@
         </section>
       </section>
 
-      <section id="practiceUploadPage" class="page">
-        <section class="panel narrow">
-          <div class="title-row"><h2>재녹음 준비</h2><span></span></div>
-          <div class="feedback"><p id="practiceContextText"></p></div>
+      <section id="practicePage" class="page">
+              <section class="panel">
+                <div class="title-row">
+                  <h2>틀린 구간 연습</h2>
+                  <span id="practiceSegmentCounter">-- / --</span>
+                </div>
 
-          <label class="file-card single" for="practiceFile">
-            <div class="file-icon">＋</div>
-            <div>
-              <strong>재녹음 파일 업로드</strong>
-              <p id="practiceFileName">파일을 선택하세요</p>
-            </div>
-          </label>
-          <input type="file" id="practiceFile" accept="audio/*" />
+                <div class="practice-slide-area">
+                  <button id="practicePrevButton" class="practice-arrow" type="button">&#9664;</button>
 
-          <div class="record-box" data-recorder="practice">
-            <div class="record-head">
-              <strong>재녹음</strong>
-              <span id="practiceRecordStatus">대기</span>
-            </div>
-            <div class="record-actions">
-              <button id="startPracticeRecordButton" class="sub-btn small" type="button">녹음 시작</button>
-              <button id="stopPracticeRecordButton" class="sub-btn small" type="button" disabled>녹음 종료</button>
-            </div>
-            <audio id="practiceRecordAudio" controls hidden></audio>
-          </div>
+                  <div class="practice-center">
+                    <p id="practiceSegmentInfo" class="practice-segment-info"></p>
 
-          <button id="restartAnalyzeButton" class="main-btn" type="button">재분석 요청</button>
-          <button class="sub-btn" type="button" data-page="finalPage">이전</button>
-        </section>
-      </section>
+                    <div class="practice-graph-stage">
+                      <div id="practiceCountdown" class="practice-countdown hidden"></div>
+                      <canvas id="practiceCanvas" aria-label="틀린 구간 비교 그래프"></canvas>
+                      <div id="practiceEffectLayer" aria-hidden="true"></div>
+                    </div>
+
+                    <button id="practicePlayButton" class="sub-btn" type="button">▶ 원곡 재생 (3초 후 시작)</button>
+
+                    <div class="record-box" data-recorder="practice">
+                      <div class="record-head">
+                        <strong>재녹음</strong>
+                        <span id="practiceRecordStatus">대기</span>
+                      </div>
+                      <div class="record-actions">
+                        <button id="startPracticeRecordButton" class="sub-btn small" type="button">녹음 시작</button>
+                        <button id="stopPracticeRecordButton" class="sub-btn small" type="button" disabled>녹음 종료</button>
+                      </div>
+                      <audio id="practiceRecordAudio" controls hidden></audio>
+                    </div>
+
+                    <button id="practiceAnalyzeButton" class="main-btn" type="button" disabled>이 구간 분석하기</button>
+                  </div>
+
+                  <button id="practiceNextButton" class="practice-arrow" type="button">&#9654;</button>
+                </div>
+
+                <button class="sub-btn" type="button" data-page="finalPage">최종 결과로 돌아가기</button>
+              </section>
+            </section>
     </main>
   </div>
 
   <script src="script.js"></script>
 </body>
+
 </html>
