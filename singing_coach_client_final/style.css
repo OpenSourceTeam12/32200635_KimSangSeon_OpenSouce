@@ -741,7 +741,7 @@ body {
 }
 
 
-/* 요청 반영: 레이아웃은 유지하되 배경과 구분되는 큰 네모 박스/테두리 제거 */
+/* 레이아웃은 유지하되 배경과 구분되는 큰 네모 박스/테두리 제거 */
 .home-layout {
   border: 0 !important;
   border-radius: 0 !important;
@@ -989,9 +989,10 @@ body {
 
 .rhythm-burst {
   position: absolute;
-  width: 9px;
-  height: 9px;
+  width: 27px;
+  height: 27px;
   border-radius: 50%;
+  background-color: currentColor;
   box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.08);
   transform: translate(-50%, -50%);
   animation: rhythmBurstSmall 360ms ease-out forwards;
@@ -999,7 +1000,7 @@ body {
 
 @keyframes rhythmBurstSmall {
   0% { transform: translate(-50%, -50%) scale(0.8); opacity: 1; }
-  55% { transform: translate(-50%, -50%) scale(1.65); opacity: 0.72; }
+  55% { transform: translate(-50%, -50%) scale(2.5); opacity: 0.72; }
   100% { transform: translate(-50%, -50%) scale(1); opacity: 0.18; }
 }
 
@@ -1012,3 +1013,90 @@ body {
     margin: 10px;
   }
 }
+
+/* 틀린 구간 연습 페이지 */
+.practice-slide-area {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.practice-arrow {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  background: none;
+  border: 1.5px solid var(--c-border);
+  border-radius: 50%;
+  font-size: 18px;
+  cursor: pointer;
+}
+
+.practice-arrow:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.practice-center {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.practice-graph-stage {
+  position: relative;
+  width: 100%;
+  height: 360px;
+  background: var(--c-surface);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+#practiceEffectLayer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 4;
+}
+
+#practiceCanvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.practice-countdown {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 64px;
+  font-weight: 700;
+  color: #ffffff;
+  background: rgba(0,0,0,0.4);
+  z-index: 10;
+}
+
+.practice-countdown.hidden {
+  display: none;
+}
+
+.practice-segment-info {
+  font-size: 13px;
+  color: var(--c-text-secondary);
+}
+
+.pitch-burst {
+  position: absolute;
+  width: 27px;
+  height: 27px;
+  border-radius: 50%;
+  background-color: currentColor;
+  transform: translate(-50%, -50%);
+  animation: rhythmBurstSmall 560ms ease-out forwards;
+}
+
+.rhythm-dot.very-fast { background: #0D47A1; }
+.rhythm-dot.very-slow { background: #B71C1C; }

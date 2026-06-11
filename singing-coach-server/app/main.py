@@ -563,3 +563,41 @@ def get_result(session_id: str):
         saved_files=saved_files,
         job=job
     )
+    
+@app.post("/practice/{session_id}")
+async def practice_segment(
+    session_id: str,
+    practice_file: UploadFile = File(...),
+    time_start: float = 0.0,
+    time_end: float = 15.0
+):
+    session_path = SESSION_DIR / session_id
+    if not session_path.exists():
+        raise HTTPException(status_code=404, detail="세션이 존재하지 않습니다.")
+
+    # 1. 재녹음 파일 저장
+    practice_path = session_path / f"practice_{int(time_start)}_{int(time_end)}.webm"
+    with open(practice_path, "wb") as f:
+        shutil.copyfileobj(practice_file.file, f)
+
+    # 2. 원곡 캐시에서 해당 구간 sliced result.json 조회
+    result_path = session_path / "result.json"
+    if not result_path.exists():
+        raise HTTPException(status_code=404, detail="분석 결과가 없습니다.")
+
+    with open(result_path, "r", encoding="utf-8") as f:
+        full_result = json.load(f)
+
+    original_file_path = full_result.get("input_files", {}).get("original_file")
+
+    # 3. 파이프라인 구간 분석 호출
+    from app.services.pipeline_service import run_pipeline_segment
+    seg_result = run_pipeline_segment(
+        original_file_path=original_file_path,
+        practice_file_path=str(practice_path),
+        time_start=time_start,
+        time_end=time_end,
+        session_dir=str(session_path)
+    )
+
+    return seg_result
